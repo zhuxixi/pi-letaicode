@@ -1,34 +1,44 @@
 #!/usr/bin/env python3
-"""LetAiCode local relay.
+"""LetAiCode local relay (bundled with pi-letaicode).
 
-Forwards pi requests to letaicode.cn main line via `curl` subprocess, because
-the site's Cloudflare WAF blocks Node/Python TLS fingerprints on the /claude
-route but allows curl's. Path-based routing:
-  /v1/messages          -> https://letaicode.cn/claude/v1/messages
-  everything else       -> https://letaicode.cn/codex<path>
+Forwards requests to https://letaicode.cn/codex via `curl` subprocess, because
+the site's Cloudflare WAF blocks Node/Python TLS fingerprints on the API
+routes but allows curl's. Every model this extension registers speaks the
+OpenAI Chat Completions format on the /codex base, so this is a single-target
+passthrough.
+
+GET /healthz answers {"ok": true} so the extension can check liveness.
 Streams the response body (incl. SSE) back to the client in real time.
+
+Usage: relay.py [port]   (default 18081)
 """
 
 import http.server
-import re
+import json
 import subprocess
 import sys
 
-LISTEN = ("127.0.0.1", 18080)
 FORWARD_TIMEOUT = 900  # seconds, generous for long thinking ops
-
-ROUTES = [
-    (re.compile(r"^/v1/messages"), "https://letaicode.cn/claude"),
-    (re.compile(r"^/"), "https://letaicode.cn/codex"),
-]
-
+UPSTREAM = "https://letaicode.cn/codex"
 SKIP_HEADERS = {"host", "content-length", "connection", "accept-encoding", "user-agent"}
-# The site's WAF blocks Anthropic SDK fingerprints; send a browser-like UA.
+# The site's WAF blocks non-browser TLS fingerprints; send a browser-like UA.
 FORWARD_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+
+    def do_GET(self):
+        if self.path.split("?", 1)[0] == "/healthz":
+            body = json.dumps({"ok": True}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(404)
+        self.end_headers()
 
     def _read_body(self):
         try:
@@ -37,22 +47,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             length = 0
         return self.rfile.read(length)
 
-    def _route(self, path):
-        for rx, base in ROUTES:
-            if rx.match(path):
-                return base + path
-        return None
-
-    def _handle(self):
+    def _forward(self):
         body = self._read_body()
-        path = self.path.split("?", 1)[0]
-        upstream = self._route(path)
-        if upstream is None:
-            self.send_response(502)
-            self.end_headers()
-            self.wfile.write(b"no route")
-            return
-
         cmd = [
             "curl",
             "-sS",
@@ -64,7 +60,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             FORWARD_UA,
             "-X",
             self.command,
-            upstream,
+            UPSTREAM + self.path,
             "--data-binary",
             "@-",
         ]
@@ -152,13 +148,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(chunk)
             self.wfile.flush()
 
-    do_POST = _handle
+    do_POST = _forward
 
     def log_message(self, format, *args):  # noqa: A002 (base class signature)
         sys.stderr.write("[relay] %s\n" % (format % args))
 
 
 if __name__ == "__main__":
-    srv = http.server.ThreadingHTTPServer(LISTEN, Handler)
-    print(f"LetAiCode relay listening on {LISTEN[0]}:{LISTEN[1]}", flush=True)
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 18081
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    print(f"LetAiCode relay listening on 127.0.0.1:{port}", flush=True)
     srv.serve_forever()

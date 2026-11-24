@@ -1,7 +1,7 @@
 {
   "name": "pi-letaicode",
-  "version": "0.1.0",
-  "description": "Pi extension for LetAiCode (letaicode.cn) models - Claude / Codex / Gemini / 国产 models via one provider setup",
+  "version": "0.2.0",
+  "description": "Pi extension for LetAiCode (letaicode.cn) - all Claude / Codex / Gemini / 国产 models with automatic catalog updates",
   "license": "MIT",
   "pi": {
     "extensions": ["./src/index.ts"]
