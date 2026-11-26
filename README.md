@@ -19,19 +19,23 @@ embedding support yet, so they are excluded.
 ## How it works
 
 - **One API format for everything.** All models accept OpenAI Chat
-  Completions on `https://letaicode.cn/codex`, so the extension registers
+  Completions on the gateway's `/codex` base, so the extension registers
   four thin providers, one per key type.
 - **Live catalog.** The site serves a public pricing endpoint
   (`/api/promotions/model-pricing`). The extension fetches it at Pi startup
   and on model refresh; new models appear without an extension update. A
   curated snapshot is bundled as the offline fallback
   (`LETAICODE_OFFLINE=1` skips the fetch entirely).
-- **Bundled relay.** letaicode.cn's Cloudflare WAF blocks the TLS
+- **Bundled relay.** The gateway's Cloudflare WAF blocks the TLS
   fingerprints of Node/Python HTTP clients; `curl` passes. The extension
   therefore ships a small curl-based relay (`relay/relay.py`, default port
   `18081`) and starts it automatically on the first request of a session. It
   needs `python3` and `curl` on PATH. If your network is not affected by the
-  WAF, set `LETAICODE_DIRECT=1` to talk to letaicode.cn directly.
+  WAF, set `LETAICODE_DIRECT=1` to talk to the gateway directly.
+- **Reachable upstream.** Requests go to `https://callyouai.com/codex` by
+  default. `letaicode.cn` serves the same gateway but is DNS-poisoned and
+  connection-blocked on many mainland-China networks — even through VPNs
+  that route `.cn` domains direct. Override with `LETAICODE_UPSTREAM`.
 
 ## Setup
 
@@ -67,11 +71,12 @@ with `/letaicode-relay status`.
 
 ## Environment variables
 
-| Variable                 | Default | Effect                                            |
-| ------------------------ | ------- | ------------------------------------------------- |
-| `LETAICODE_DIRECT`       | unset   | `1` = connect to letaicode.cn directly, no relay  |
-| `LETAICODE_RELAY_PORT`   | `18081` | Local port for the bundled relay                  |
-| `LETAICODE_OFFLINE`      | unset   | `1` = never fetch the live catalog                |
+| Variable                 | Default                        | Effect                                            |
+| ------------------------ | ------------------------------ | ------------------------------------------------- |
+| `LETAICODE_DIRECT`       | unset                          | `1` = connect to the gateway directly, no relay   |
+| `LETAICODE_RELAY_PORT`   | `18081`                        | Local port for the bundled relay                  |
+| `LETAICODE_OFFLINE`      | unset                          | `1` = never fetch the live catalog                |
+| `LETAICODE_UPSTREAM`     | `https://callyouai.com/codex`  | Gateway base URL (e.g. `https://letaicode.cn/codex`) |
 
 ## Commands
 
@@ -90,5 +95,5 @@ registrations, and the extension replaces them entirely.
   converted from CNY with the site's rate (7) for cost tracking.
 - Image models (`gpt-image-*`) are exposed through the chat-completions
   format and included; treat them as experimental in Pi.
-- The relay only forwards requests to `letaicode.cn`; your API key is sent
-  by Pi with every request and never stored by the extension.
+- The relay only forwards requests to the LetAiCode gateway; your API key is
+  sent by Pi with every request and never stored by the extension.

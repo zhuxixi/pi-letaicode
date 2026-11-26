@@ -13,10 +13,15 @@
  * and on model refresh, so new models appear without updating the extension.
  * A curated static snapshot is the offline fallback.
  *
- * Relay: letaicode.cn's Cloudflare WAF blocks Node/Python TLS fingerprints on
+ * Relay: the gateway's Cloudflare WAF blocks Node/Python TLS fingerprints on
  * the API routes; curl passes. A bundled curl-based relay is started lazily on
  * the first request of a session (default port 18081). Set LETAICODE_DIRECT=1
- * to point at letaicode.cn directly instead.
+ * to point at the gateway directly instead.
+ *
+ * Upstream: defaults to https://callyouai.com/codex — letaicode.cn is
+ * DNS-poisoned and connection-blocked on many mainland-China networks (even
+ * through VPNs that route .cn direct), while callyouai.com serves the same
+ * gateway. Override with LETAICODE_UPSTREAM.
  *
  * Keys: store them per provider via `pi login` or the /login command.
  */
@@ -34,7 +39,7 @@ const DIRECT = process.env.LETAICODE_DIRECT === "1";
 const OFFLINE = process.env.LETAICODE_OFFLINE === "1";
 const PORT = Number(process.env.LETAICODE_RELAY_PORT ?? "18081");
 const RELAY_URL = `http://127.0.0.1:${PORT}`;
-const DIRECT_URL = "https://letaicode.cn/codex";
+const DIRECT_URL = (process.env.LETAICODE_UPSTREAM ?? "https://callyouai.com/codex").replace(/\/+$/, "");
 const BROWSER_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 

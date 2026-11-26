@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """LetAiCode local relay (bundled with pi-letaicode).
 
-Forwards requests to https://letaicode.cn/codex via `curl` subprocess, because
+Forwards requests to the LetAiCode gateway via `curl` subprocess, because
 the site's Cloudflare WAF blocks Node/Python TLS fingerprints on the API
 routes but allows curl's. Every model this extension registers speaks the
 OpenAI Chat Completions format on the /codex base, so this is a single-target
 passthrough.
+
+Upstream defaults to https://callyouai.com/codex: letaicode.cn is DNS-poisoned
+and connection-blocked on many mainland-China networks (even through some
+VPNs that route .cn domains direct), while callyouai.com serves the same
+gateway and stays reachable. Override with LETAICODE_UPSTREAM.
 
 GET /healthz answers {"ok": true} so the extension can check liveness.
 Streams the response body (incl. SSE) back to the client in real time.
@@ -15,11 +20,13 @@ Usage: relay.py [port]   (default 18081)
 
 import http.server
 import json
+import os
 import subprocess
 import sys
 
 FORWARD_TIMEOUT = 900  # seconds, generous for long thinking ops
-UPSTREAM = "https://letaicode.cn/codex"
+CONNECT_TIMEOUT = 20  # fail fast when the upstream is unreachable
+UPSTREAM = os.environ.get("LETAICODE_UPSTREAM", "https://callyouai.com/codex").rstrip("/")
 SKIP_HEADERS = {"host", "content-length", "connection", "accept-encoding", "user-agent"}
 # The site's WAF blocks non-browser TLS fingerprints; send a browser-like UA.
 FORWARD_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -54,6 +61,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "-sS",
             "-i",
             "-N",
+            "--connect-timeout",
+            str(CONNECT_TIMEOUT),
             "--max-time",
             str(FORWARD_TIMEOUT),
             "-A",
@@ -99,9 +108,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             pass  # curl died early; read whatever it printed below
 
         # Read upstream headers incrementally until the blank line.
+        # read1() returns whatever is available instead of blocking for the
+        # full buffer size, so small SSE chunks stream through in real time.
         buf = b""
         while b"\r\n\r\n" not in buf:
-            chunk = stdout.read(256)
+            chunk = stdout.read1(256)
             if not chunk:
                 break
             buf += chunk
@@ -142,7 +153,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(rest)
         self.wfile.flush()
         while True:
-            chunk = stdout.read(8192)
+            chunk = stdout.read1(8192)
             if not chunk:
                 break
             self.wfile.write(chunk)
