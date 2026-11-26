@@ -70,11 +70,13 @@ export default async function (pi: ExtensionAPI) {
     const relayScript = findRelayScript();
 
     // Lazily start the relay before the first request of each session.
+    // The event carries only headers, so the provider is read from the
+    // context; when it is unavailable, ensure the relay anyway (safe: it is
+    // only reachable at 127.0.0.1 and never sees traffic from other providers).
     pi.on("before_provider_headers", async (_event, ctx) => {
-      const provider = ctx.model?.provider;
-      if (typeof provider === "string" && provider.startsWith("letaicode-")) {
-        await ensureRelay(PORT, relayScript);
-      }
+      const provider = (ctx.model as { provider?: string } | undefined)?.provider;
+      if (typeof provider === "string" && !provider.startsWith("letaicode-")) return;
+      await ensureRelay(PORT, relayScript);
     });
 
     // Kill the relay we own when the session ends.
