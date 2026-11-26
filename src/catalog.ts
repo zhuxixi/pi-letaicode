@@ -94,7 +94,7 @@ const CURATED: Record<string, CuratedMeta> = {
   "gpt-6.1-terra": { name: "GPT-6.1 Terra", reasoning: true, thinkingLevelMap: TLM_GPT, input: CHAT_INPUT },
   "gpt-6.1-sol": { name: "GPT-6.1 Sol", reasoning: true, thinkingLevelMap: TLM_GPT, input: CHAT_INPUT },
   "gpt-6-sol": { name: "GPT-6 Sol", reasoning: true, thinkingLevelMap: TLM_GPT, input: CHAT_INPUT },
-  "gpt-6-astra": { name: "GPT-6 Astra", reasoning: true, thinkingLevelMap: TLM_GPT, contextWindow: 1050000, maxTokens: null, input: CHAT_INPUT },
+  "gpt-6-astra": { name: "GPT-6 Astra", reasoning: true, thinkingLevelMap: TLM_GPT, contextWindow: 1050000, input: CHAT_INPUT },
   "gpt-5.6-sol": { name: "GPT-5.6 Sol", reasoning: true, thinkingLevelMap: TLM_GPT, input: CHAT_INPUT },
   "gpt-5.6-terra": { name: "GPT-5.6 Terra", reasoning: true, thinkingLevelMap: TLM_GPT, input: CHAT_INPUT },
   "gpt-5.6-luna": { name: "GPT-5.6 Luna", reasoning: true, thinkingLevelMap: TLM_GPT, input: CHAT_INPUT },
